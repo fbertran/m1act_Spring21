@@ -1,0 +1,464 @@
+---
+title: 'Cours 1 : données Vulnerability '
+keep_tex: yes
+output: html_document
+#output:
+#  slidy_presentation: default
+#  ioslides_presentation: default
+#  slide_level: 2
+#  beamer_presentation: null
+fontsize: 9pt
+---
+# Avant de commencer
+## Faire pointer R vers votre répertoire
+```{r, eval=FALSE}
+setwd("le répertoire de mes données")
+```
+
+```{r}
+#knitr::opts_knit$set(root.dir = "~/Documents/GitHub/m1act_Spring21")
+datadir <- "~/Documents/GitHub/m1act_Spring21/data"
+exportdir <- "~/Documents/GitHub/m1act_Spring21/export"
+graphdir <- "~/Documents/GitHub/m1act_Spring21/graph"
+```
+
+## (Installer et) charger la librairie faraway
+```{r, echo=FALSE}
+#if(!require(faraway)){install.packages("faraway")}
+if(!("faraway" %in% rownames(installed.packages()))){install.packages("faraway")}
+```
+
+```{r}
+library(faraway)
+```
+
+## Export et import d'objets R
+```{r}
+aaa=rnorm(100)
+bbb=rpois(100,1)
+save(aaa,bbb,file=paste(exportdir,"simulations.RData",sep="/"))
+rm(aaa,bbb)
+try(aaa)
+try(bbb)
+load(paste(exportdir,"simulations.RData",sep="/"))
+aaa
+bbb
+```
+
+# données "vulnerability"
+```{r}
+load(paste(datadir,"vulnerability.RData",sep="/"))
+#attach(vul)
+#country_name
+#detach(vul)
+with(vul, country_name)
+summary(vul)
+```
+## scatterplot
+```{r}
+with(vul,pairs(~ln_death_risk+ln_events+ln_fert+hdi+ln_pop,  main="Simple Scatterplot Matrix"))
+```
+
+```{r message=FALSE, cache=TRUE}
+if(!("GGally" %in% rownames(installed.packages()))){install.packages("GGally")}
+library(GGally)
+with(vul, ggpairs(vul[,c("ln_death_risk","ln_events","ln_fert","hdi","ln_pop")]))
+```
+
+## Modèle avec 1 covariable
+```{r}
+fit_univ = lm(ln_death_risk~ln_events,data=vul)
+newdata=data.frame(ln_events=3.4)
+pred=predict(fit_univ,newdata,interval="predict")
+ic=predict(fit_univ,interval="confidence")
+print(pred)
+print(ic[1:5,])
+```
+
+```{r message=FALSE}
+if(!("HH" %in% rownames(installed.packages()))){install.packages("HH")}
+library('HH')
+```
+
+##
+```{r}
+ci.plot(fit_univ)
+```
+
+
+## Modèle avec les 4 covariables + intercept
+### fonction lm
+```{r}
+fit = lm(ln_death_risk~ln_events+ln_fert+hdi+ln_pop, data=vul)
+summary(fit)
+```
+```{r}
+anova(fit)
+```
+```{r}
+coef(fit)
+```
+```{r}
+head(residuals(fit))
+```
+
+# Diagnostics sur X
+## Matrice de correlations
+### Definition de la matrice
+```{r}
+X = vul[,c("ln_events","ln_fert","hdi","ln_pop")]
+all(X==vul[,c(3:6)])
+cor_mat = cor(X)
+cov_mat = cov(X)
+```
+### Calcul des valeurs propres et vecteurs propres
+```{r}
+propres = eigen(cor_mat)
+propres$values
+propres$values[1] / propres$values
+```
+
+## 
+```{r}
+library(HH,quietly = TRUE)
+```
+## Variance inflation factors
+```{r}
+vif(fit)
+```
+Les *VIF* sont tous inférieurs à **5**, donc pas de problème de colinéarité.
+
+Calcul des VIFs directement à partir des formules.
+```{r}
+R2.1 = summary(lm(ln_events~ln_fert+hdi+ln_pop, data=vul))$r.squared
+(VIF1 <- 1/(1 - R2.1))
+R2.2 = summary(lm(ln_fert~ln_events+hdi+ln_pop, data=vul))$r.squared
+(VIF2 <- 1/(1 - R2.2))
+R2.3 = summary(lm(hdi~ln_events+ln_fert+ln_pop, data=vul))$r.squared
+(VIF3 <- 1/(1 - R2.3))
+R2.4 = summary(lm(ln_pop~ln_events+ln_fert+hdi, data=vul))$r.squared
+(VIF4 <- 1/(1 - R2.4))
+```
+
+
+# Analyse des résidus
+
+##
+### Valeurs ajustées $\hat y$
+```{r}
+yhat = fitted(fit)
+#fit$fitted.values
+```
+### Résidus $e = y - \hat y$
+
+
+```{r}
+e = residuals(fit)
+#fit$residuals
+```
+
+
+Vérification du calcul des résidus à partir des valeurs ajustées. Utilité de la fonction `all.equal` par rapport à la comparaison directe avec `==`.
+```{r}
+with(vul, all(ln_death_risk-yhat==residuals(fit)))
+with(vul, all.equal(ln_death_risk-yhat,residuals(fit)))
+```
+
+
+### Residus stabdardisés $e'$
+```{r}
+e_prime = rstandard(fit)
+```
+
+### Residus studentisés $e^\star$
+```{r}
+e_star = rstudent(fit)
+```
+
+
+```{r}
+lattice::histogram(e_prime-e_star)
+boxplot(e_prime-e_star)
+```
+
+
+## Normalité des erreurs
+```{r}
+#plot(fit,which=2)
+shapiro.test(e)
+qqnorm(e)
+qqline(e)
+```
+
+
+L'asymétrie de la distribution de la racine carré de la valeur absolue des résidus standardisés $\sqrt{|E|}$ est beaucoup plus faible que celle de la valeur absolue des résidus standardisés $|E|$ si les $E$ sont distribuées suivant des lois normales centrées $N(0,.)$. Utiliser cette racine carrée permet donc d'avoir un indicateur supplémentaire de normalité.
+
+## Graphique résidus/valeurs ajustées
+```{r}
+plot(fit,which=1)
+```
+
+## Graphique scale-location
+```{r}
+if(!("lmtest" %in% rownames(installed.packages()))){install.packages("lmtest")}
+```
+
+```{r}
+plot(fit,which=3)
+library(lmtest, quietly = TRUE)
+bptest(ln_death_risk~ln_events+ln_fert+hdi+ln_pop+I(ln_events^2)+I(ln_fert^2)+I(hdi^2)+I(ln_pop^2),data = vul)
+```
+
+##Pas de normalité -> permutations
+###Version 1 avec lmPerm
+```{r}
+library(lmPerm)
+fit_p <- lmp(ln_death_risk~ln_events+ln_fert+hdi+ln_pop, data=vul)
+summary(fit_p)
+```
+
+###Version 2 avec pgirmess
+```{r}
+library(pgirmess)
+fit_p2 <- PermTest(fit)
+print(fit_p2)
+```
+
+
+
+## Cas avec hétéroscédasticité :
+
+### Données simulées
+```{r}
+n =50
+X=rnorm(n,1)
+epsilon = rnorm(n,0,0.5)
+Yok = 2 +3* X+epsilon
+lmok = lm(Yok~X)
+
+Yhs = 2 +3* X+ abs(X)^2*epsilon
+lmhs = lm(Yhs~X)
+```
+
+## Graphiques résidus/ajustées
+```{r ,fig.width=15, fig.height=10}
+par(mfrow=c(1,2))
+plot(lmok,which=1,main="cas ok")
+plot(lmhs,which=1,main="cas heteroscedastique")
+#plot(lmnl,which=1,main="cas non lineaire")
+```
+
+## Graphiques scale/location
+```{r ,fig.width=15, fig.height=10}
+par(mfrow=c(1,2))
+plot(lmok,which=3,main="cas ok")
+plot(lmhs,which=3,main="cas heteroscedastique")
+#plot(lmnl,which=3,main="cas non lineaire")
+```
+
+
+
+# Observations influentes
+
+## Où sont les points "aberrants" ?
+```{r ,fig.width=15, fig.height=10}
+pairs(~ln_death_risk+ln_events+ln_fert+hdi+ln_pop,  main="Simple Scatterplot Matrix", data=vul, col=(24+36*as.numeric(abs(e_star)>2)))
+```
+
+## Leviers, observations influentes
+
+#Illustrer notion de levier
+```{r}
+influences = lm.influence(fit)
+hat = influences$hat
+```
+
+## Graphique des résidus
+```{r ,fig.width=15, fig.height=10}
+
+pairs(~ln_death_risk+ln_events+ln_fert+hdi+ln_pop, data=vul, 
+      main="Simple Scatterplot Matrix", 
+      col=(24+50*as.numeric(hat>(2*4+2) / nrow(vul))))
+
+```
+
+## Graphique DCook
+
+```{r ,fig.width=15, fig.height=10}
+any((e^2-hat)/((ncol(X)-1+1)*(1-hat)^2)>4/nrow(vul))
+which((e^2-hat)/((ncol(X)-1+1)*(1-hat)^2)>4/nrow(vul))
+par(mfrow=c(1,2))
+plot(fit, which=4:5)
+```
+
+## Graphique Dbetas
+
+```{r ,fig.width=15, fig.height=10}
+dfbetas=apply(abs(influences$coefficients)/influences$sigma,1,`/`,sqrt(c(144,diag(cov_mat))))
+colSums(dfbetas>2/nrow(vul))
+```
+
+
+# Relations non-linéaires
+
+## Relation non-linéaire due à une covariable
+```{r}
+n =50
+X=matrix(rnorm(n*2),ncol=2)
+epsilon = rnorm(n,0,0.5)
+
+Ynl = 2 - X[,1] + 3* X[,2]^2 + epsilon
+lmnl = lm(Ynl~X[,1]+X[,2])
+```
+
+##
+```{r ,fig.width=15, fig.height=10}
+par(mfrow=c(1,2))
+plot(lmnl, which = 1:2)
+```
+
+##
+```{r ,fig.width=15, fig.height=10}
+par(mfrow=c(1,2))
+plot(lmnl, which = 3:4)
+```
+
+
+##
+```{r}
+library(car)
+```
+
+## 
+```{r ,fig.width=15, fig.height=10}
+crPlots(lmnl)
+```
+
+## Transformation de la variable
+```{r ,fig.width=15, fig.height=10}
+X2_2 = X[,2]^2
+lmnl_2 = lm(Ynl~X[,1]+X2_2)
+crPlots(lmnl_2)
+```
+
+
+## Relation non-linéaire due  Y
+```{r}
+n =50
+X=matrix(rnorm(n*2),ncol=2)
+epsilon = rnorm(n,0,0.5)
+
+ln_Y = 1 - X[,1] + 0.1* X[,2] + epsilon
+Y = exp(ln_Y)
+lm_ln = lm(Y~X[,1]+X[,2])
+
+```
+
+
+##
+```{r ,fig.width=15, fig.height=10}
+par(mfrow=c(1,2))
+plot(lm_ln, which = 1:2)
+```
+
+##
+```{r ,fig.width=15, fig.height=10}
+par(mfrow=c(1,2))
+plot(lm_ln, which = 3:4)
+```
+
+##
+```{r ,fig.width=15, fig.height=10}
+crPlots(lm_ln)
+```
+
+## Transformation de Y
+```{r}
+lm_ln_trans = lm(log(Y)~X[,1]+X[,2])
+plot(lm_ln_trans)
+```
+
+##
+```{r}
+crPlots(lm_ln_trans)
+```
+
+
+
+# Interpretation : variables discrètes
+
+##
+```{r}
+?mtcars
+mtcars_simple = mtcars[c(1,2,6)]
+summary(mtcars_simple)
+```
+
+##
+```{r}
+library("dplyr")
+```
+
+##
+```{r}
+glimpse(mtcars_simple)
+```
+
+##
+```{r}
+mtcars_simple<- dplyr::mutate(mtcars_simple, cyl = factor(cyl))
+glimpse(mtcars_simple)
+```
+
+##
+```{r}
+fit_simple = lm(mpg~wt+factor(cyl),data=mtcars_simple)
+summary(fit_simple)
+```
+
+##
+```{r}
+library(ggplot2)
+```
+
+##
+```{r}
+ggplot(mtcars_simple, aes(x=wt, y=mpg, color=cyl, shape=cyl)) +
+  geom_point() 
+
+```
+
+##
+```{r}
+fit_croise = lm(mpg ~ wt * cyl, data = mtcars_simple)
+summary(fit_croise)
+```
+
+##
+```{r}
+ggplot(mtcars_simple, aes(x=wt, y=mpg, color=cyl, shape=cyl)) +
+  geom_point() + 
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE)
+```
+
+
+```{r}
+ggplot(mtcars_simple, aes(x=wt, y=mpg)) +
+  geom_point() + 
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE, formula = y ~ x)
+```
+```{r}
+summary(fit_simple)
+summary(fit_croise)
+```
+
+
+```{r}
+anova(fit_simple)
+anova(fit_croise)
+```
+
+```{r}
+anova(fit_simple,fit_croise)
+```
+
