@@ -9,6 +9,7 @@ output: html_document
 #  beamer_presentation: null
 fontsize: 9pt
 ---
+
 # Avant de commencer
 ## Faire pointer R vers votre répertoire
 ```{r, eval=FALSE}
