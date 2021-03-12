@@ -1,0 +1,29 @@
+---
+title: "Your Document Title"
+author: "Document Author"
+date: "`r Sys.Date()`"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    highlight: github
+---
+
+## A New Output Format
+```{r}
+MatData=matrix(rnorm(60),nrow=30)
+colnames(MatData)<-c("Y","X")
+MatData <- as.data.frame(MatData)
+MatData
+str(MatData)
+```
+
+
+```{r}
+fit.lm <- lm(Y~X,data=MatData)
+summary(fit.lm)
+```
+```{r}
+sum.fit.lm <- summary(fit.lm)
+with(sum.fit.lm,1-(sum(df[1:2])-1)*(1-r.squared)/df[2])
+```
+
