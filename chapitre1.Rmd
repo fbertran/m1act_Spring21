@@ -195,7 +195,7 @@ library(HH,quietly = TRUE)
 ```
 ## Variance inflation factors
 ```{r}
-vif(fit)
+HH::vif(fit)
 ```
 Les *VIF* sont tous inférieurs à **5**, donc pas de problème de colinéarité.
 
@@ -253,14 +253,30 @@ boxplot(e_prime-e_star)
 ```
 
 
+```{r, fig.width=7, fig.height=10}
+layout(1:2)
+qqplot(qt(ppoints(length(e_star)),df=length(e_star)-fit$rank-1),e_star)
+qqnorm(e_star)
+layout(1)
+```
+
+Différence entre les points support gaussiens et les autres.
+```{r}
+max(abs(qt(ppoints(length(e_star)),df=length(e_star)-fit$rank-1)-qnorm(ppoints(length(e_star)))))
+```
+
+
+
 ## Normalité des erreurs
 ```{r}
-#plot(fit,which=2)
+plot(fit,which=2)
+```
+
+```{r}
 shapiro.test(e)
 qqnorm(e)
 qqline(e)
 ```
-
 
 L'asymétrie de la distribution de la racine carré de la valeur absolue des résidus standardisés $\sqrt{|E|}$ est beaucoup plus faible que celle de la valeur absolue des résidus standardisés $|E|$ si les $E$ sont distribuées suivant des lois normales centrées $N(0,.)$. Utiliser cette racine carrée permet donc d'avoir un indicateur supplémentaire de normalité.
 
@@ -276,6 +292,12 @@ if(!("lmtest" %in% rownames(installed.packages()))){install.packages("lmtest")}
 
 ```{r}
 plot(fit,which=3)
+```
+
+Test d'homoscédasticité
+
+Avec cette écriture BP test = test de White
+```{r}
 library(lmtest, quietly = TRUE)
 bptest(ln_death_risk~ln_events+ln_fert+hdi+ln_pop+I(ln_events^2)+I(ln_fert^2)+I(hdi^2)+I(ln_pop^2),data = vul)
 ```
